@@ -31,4 +31,5 @@ class RedisDB(DB):
         return response
 
     def delete_task(self, task_id):
-        pass
+        self.__db.delete(task_id)
+        return True

@@ -1,28 +1,33 @@
-from celery import Celery
-from PIL import Image
+from image_processing import ImgManager
+from env_setup import celery_app, task_db
 
-import os
-import redis
 import json
-
-# TODO: import from config
-UPLOAD_DIR = os.path.join(os.path.curdir, 'static', 'images', 'uploaded')
-THUMB_DIR = os.path.join(os.path.curdir, 'static', 'images', 'thumbnails')
-
-# TODO: import broker and backend from config
-celery_app = Celery('tasks', broker='redis://127.0.0.1:6379', backend='redis://127.0.0.1:6379')
-db = redis.Redis()
 
 
 @celery_app.task
-def resize(manager, width, height):
-    img = Image.open(os.path.join(UPLOAD_DIR, manager.img_name))
+def resize(width, height, img_name, new_img_name):
+    ImgManager.resize(width, height, img_name, new_img_name)
 
-    out_img_name = os.path.join(THUMB_DIR, str(manager.new_img_name))
-    new_img = img.resize((width, height), Image.ANTIALIAS)
-    new_img.save(out_img_name)
 
-    task = json.loads(manager.db.get_task(manager.process_id))
-    task.update({'status': 'done'})
-    manager.db.set_task(manager.process_id, json.dumps(task))
-    return out_img_name
+@celery_app.task
+def delete(img_name):
+    ImgManager.delete(img_name)
+
+
+@celery_app.task
+def set_pending(task_id, **kwargs):
+    db_value = kwargs
+    db_value.update({'status': 'pending'})
+    task_db.set_task(task_id, json.dumps(db_value))
+
+
+@celery_app.task
+def set_done(task_id, **kwargs):
+    db_value = kwargs
+    db_value.update({'status': 'done'})
+    task_db.set_task(task_id, json.dumps(db_value))
+
+
+@celery_app.task
+def log():
+    pass
